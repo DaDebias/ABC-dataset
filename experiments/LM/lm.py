@@ -1,4 +1,5 @@
 from transformers import BertTokenizer, BertForMaskedLM
+from transformers import AutoTokenizer, AutoModelForMaskedLM
 import torch
 from nltk.tokenize import sent_tokenize
 import pandas as pd
@@ -21,21 +22,27 @@ data = args.data
 
 #we use chinese and multilingual bert
 if lang  == "zh":
-    bertMaskedLM = BertForMaskedLM.from_pretrained('bert-base-chinese')
+    model = BertForMaskedLM.from_pretrained('bert-base-chinese')
     tokenizer = BertTokenizer.from_pretrained('bert-base-chinese', do_lower_case=False)
 
-else:
-    bertMaskedLM = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
 
-bertMaskedLM.eval()
+else:
+    model = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
+    #model = AutoModelForMaskedLM.from_pretrained('xlm-roberta-large')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+    #tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large')
+
+
+model.eval()
 
 
 def score(sentence, lang):
+    print("here is the sentence before tokenization")
+    print(sentence)
     sentence = "[CLS] "+sentence+" [SEP]"
 
     if lang == "da":
-        prons = ["sin", "sit", "sine"]
+        prons = ["sin", "sit", "sine", "▁sin", "▁sit", "▁sine"]
     if lang == "ru":
         prons = "свой,своя́,своё,свои́,своего́,свое́й,своего́,свои́х,своему́,свое́й,своему́,\
                 свои́м,своего́,свою,своего́,свои́х,свои́м,свое́й,свои́м,свои́ми,своём,свое́й,\
@@ -53,9 +60,14 @@ def score(sentence, lang):
 
     segments_tensors = torch.tensor([segments_ids])
 
+    print("here is the sentence after tokenization")
+    print(tokenize_input)
+
     no_pron = True
     for i, token in enumerate(tokenize_input):
+        print(token)
         if token in prons:
+            print(f"Found it! this token: {token} was in the pronouns list")
             pron_index = i
             no_pron = False
             break
@@ -69,10 +81,17 @@ def score(sentence, lang):
     tokenize_mask_female = tokenize_input.copy()
     tokenize_mask_refl = tokenize_input.copy()
 
+
     if lang == "da":
+        print("running Danish")
         tokenize_mask_male[pron_index] = "hans"
         tokenize_mask_female[pron_index] = "hendes"
 
+        print("this is the tokenized sentence after masking with male word")
+        print(tokenize_mask_male)
+
+        print("this is the tokenized sentence after masking with female word")
+        print(tokenize_mask_female)
 
     if lang == "ru":
         tokenize_mask_male[pron_index] = "его"
@@ -110,14 +129,16 @@ def score(sentence, lang):
     print("predicting...")
 
     with torch.no_grad():
-        predictions_male = bertMaskedLM(tensor_input_male, segments_tensors)[0]
+        predictions_male = model(tensor_input_male, segments_tensors)[0]
+        print(f"predicions male: {predictions_male}")
 
 
     with torch.no_grad():
-        predictions_female = bertMaskedLM(tensor_input_female, segments_tensors)[0]
+        predictions_female = model(tensor_input_female, segments_tensors)[0]
+        print(f"predicions female: {predictions_female}")
 
     with torch.no_grad():
-        predictions_truth = bertMaskedLM(tensor_truth, segments_tensors)[0]
+        predictions_truth = model(tensor_truth, segments_tensors)[0]
 
     #predicted_male = predictions_male[0, pron_index].unsqueeze(0)
     #predicted_female = predictions_female[0, pron_index].unsqueeze(0)
@@ -127,6 +148,10 @@ def score(sentence, lang):
     loss_male = loss_fct(predictions_male.squeeze(),tensor_truth.squeeze()).data
     loss_female = loss_fct(predictions_female.squeeze(),tensor_truth.squeeze()).data
     loss_ref = loss_fct(predictions_truth.squeeze(),tensor_truth.squeeze()).data
+    print(f"loss male: {loss_male}")
+    print(f"loss female: {loss_female}")
+
+
     #print(loss)
     return "male: "+ str(loss_male.item())+" "+ str(math.exp(loss_male))+ " female: "+ str(loss_female.item())+ " " +\
             str(math.exp(loss_female)) + " refl: "+ str(loss_ref.item())+ " " + str(math.exp(loss_ref))
@@ -138,7 +163,7 @@ def score_standard(sentence):
     tokenize_input = tokenizer.tokenize(sentence)
 
     tensor_input = torch.tensor([tokenizer.convert_tokens_to_ids(tokenize_input)])
-    predictions=bertMaskedLM(tensor_input)
+    predictions=model(tensor_input)
     loss_fct = torch.nn.CrossEntropyLoss()
     loss = loss_fct(predictions.squeeze(),tensor_input.squeeze()).data
 
