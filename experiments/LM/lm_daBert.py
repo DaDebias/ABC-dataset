@@ -1,5 +1,8 @@
-from transformers import BertTokenizer, BertForMaskedLM
-from transformers import AutoTokenizer, AutoModelForMaskedLM, AutoModelForPreTraining
+from transformers import logging
+logging.set_verbosity_warning()
+
+#from transformers import BertTokenizer, BertForMaskedLM
+from transformers import AutoTokenizer, AutoModelForPreTraining
 import torch
 from nltk.tokenize import sent_tokenize
 import pandas as pd
@@ -18,7 +21,7 @@ args = parser.parse_args()
 lang = args.lang
 filename = args.filename
 data = args.data
-
+model_name = "danish_bert"
 
 #we use chinese and multilingual bert
 if lang  == "zh":
@@ -28,23 +31,23 @@ if lang  == "zh":
 
 else:
     #model = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
-    #model = AutoModelForPreTraining.from_pretrained('Maltehb/danish-bert-botxo')
-    model = AutoModelForMaskedLM.from_pretrained('xlm-roberta-large')
+    model = AutoModelForPreTraining.from_pretrained('Maltehb/danish-bert-botxo')
+    #model = AutoModelForMaskedLM.from_pretrained('xlm-roberta-large')
     #tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
-    #tokenizer = AutoTokenizer.from_pretrained('Maltehb/danish-bert-botxo', do_lower_case=False)
-    tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large')
+    tokenizer = AutoTokenizer.from_pretrained('Maltehb/danish-bert-botxo', do_lower_case=False)
+    #tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large', do_lower_case=False)
 
 
 model.eval()
 
 
 def score(sentence, lang):
-    print("here is the sentence before tokenization")
-    print(sentence)
+    #print("here is the sentence before tokenization")
+    #print(sentence)
     sentence = "[CLS] "+sentence+" [SEP]"
 
     if lang == "da":
-        prons = ["sin", "sit", "sine", "▁sin", "▁sit", "▁sine"]
+        prons = ["sin", "sit", "sine"]
     if lang == "ru":
         prons = "свой,своя́,своё,свои́,своего́,свое́й,своего́,свои́х,своему́,свое́й,своему́,\
                 свои́м,своего́,свою,своего́,свои́х,свои́м,свое́й,свои́м,свои́ми,своём,свое́й,\
@@ -56,20 +59,20 @@ def score(sentence, lang):
     if lang == "zh":
         prons = "自己"
 
-    print("Tokenizing....")
+    #print("Tokenizing....")
     tokenize_input = tokenizer.tokenize(sentence)
     segments_ids = [0] * len(tokenize_input)
 
     segments_tensors = torch.tensor([segments_ids])
 
-    print("here is the sentence after tokenization")
-    print(tokenize_input)
+    #print("here is the sentence after tokenization")
+    #print(tokenize_input)
 
     no_pron = True
     for i, token in enumerate(tokenize_input):
-        print(token)
+        #print(token)
         if token in prons:
-            print(f"Found it! this token: {token} was in the pronouns list")
+            #print(f"Found it! this token: {token} was in the pronouns list")
             pron_index = i
             no_pron = False
             break
@@ -77,7 +80,7 @@ def score(sentence, lang):
 
     if no_pron==True: return "no pronouns to replace"
 
-    print("masking reflexive pronoun.....")
+    #print("masking reflexive pronoun.....")
     #slightly different logics for each language
     tokenize_mask_male = tokenize_input.copy()
     tokenize_mask_female = tokenize_input.copy()
@@ -85,15 +88,15 @@ def score(sentence, lang):
 
 
     if lang == "da":
-        print("running Danish")
-        tokenize_mask_male[pron_index] = "_hans"
-        tokenize_mask_female[pron_index] = "_hendes"
+        #print("running Danish")
+        tokenize_mask_male[pron_index] = "hans"
+        tokenize_mask_female[pron_index] = "hendes"
 
-        print("this is the tokenized sentence after masking with male word")
-        print(tokenize_mask_male)
+        #print("this is the tokenized sentence after masking with male word")
+        #print(tokenize_mask_male)
 
-        print("this is the tokenized sentence after masking with female word")
-        print(tokenize_mask_female)
+        #print("this is the tokenized sentence after masking with female word")
+        #print(tokenize_mask_female)
 
     if lang == "ru":
         tokenize_mask_male[pron_index] = "его"
@@ -104,7 +107,7 @@ def score(sentence, lang):
         tokenize_mask_female = tokenizer.tokenize(sentence.replace("自己","她 UNK" ))
         tokenize_mask_refl = tokenize_input.copy()
 
-        print(tokenize_mask_female,tokenize_mask_refl )
+        #print(tokenize_mask_female,tokenize_mask_refl )
 
         truth_index = tokenize_input.index("己")
         male_index = tokenize_mask_male.index("他")
@@ -132,12 +135,12 @@ def score(sentence, lang):
 
     with torch.no_grad():
         predictions_male = model(tensor_input_male, segments_tensors)[0]
-        print(f"predicions male: {predictions_male}")
+        #print(f"predicions male: {predictions_male}")
 
 
     with torch.no_grad():
         predictions_female = model(tensor_input_female, segments_tensors)[0]
-        print(f"predicions female: {predictions_female}")
+        #print(f"predicions female: {predictions_female}")
 
     with torch.no_grad():
         predictions_truth = model(tensor_truth, segments_tensors)[0]
@@ -150,8 +153,8 @@ def score(sentence, lang):
     loss_male = loss_fct(predictions_male.squeeze(),tensor_truth.squeeze()).data
     loss_female = loss_fct(predictions_female.squeeze(),tensor_truth.squeeze()).data
     loss_ref = loss_fct(predictions_truth.squeeze(),tensor_truth.squeeze()).data
-    print(f"loss male: {loss_male}")
-    print(f"loss female: {loss_female}")
+    #print(f"loss male: {loss_male}")
+    #print(f"loss female: {loss_female}")
 
 
     #print(loss)
@@ -187,7 +190,7 @@ if data=='ABC':
                     reflexive_sents.append(line.strip())
                     restart = 1
 
-    with open("outputs/lm/out_"+lang+".txt", "w") as f:
+    with open("outputs/lm/out_"+lang+"_"+model_name+".txt", "w") as f:
         for i, sent in tqdm(enumerate(reflexive_sents)):
             scores = score(sent, lang)
             f.write(sent +" "+ scores +"\n")
