@@ -12,7 +12,7 @@ filename = args.coref_output
 
 #with open("occupations_chi.txt", "r") as f:
 #    gold =[line.strip() for line in f.readlines() ]
-with open('experiments/prons/prons.'+lang, "r") as f:
+with open('/Users/thearolskovsloth/Documents/MASTERS_I_COGSCI/local_cool_prog_thesis/ABC-dataset/experiments/prons/prons.'+lang, "r") as f:
     prons = [line.strip() for line in f.readlines()]
     reflexives, fem, masc = prons[0].lower(), prons[1].lower(), prons[2].lower()
 
@@ -63,17 +63,20 @@ for pred in chunk_preds:
 
     for i, cluster in enumerate(clusters):
         if i == 0:
-
             if cluster != []:
                 ref+=1
         elif i==1:
             if cluster != []:
                 male+=1
         else:
-
             if cluster != []:
                 fem+=1
 
+
+print("all", len(chunk_preds))
+print("reflexive", ref)
+print("female", fem)
+print("male", male)
 print("Hallucinating clusters...")
 print("male: ", (male/len(chunk_preds))*100, "% of the time")
 print("female: ", (fem/len(chunk_preds))*100, "% of the time")
