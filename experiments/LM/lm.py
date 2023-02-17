@@ -1,5 +1,5 @@
 from transformers import BertTokenizer, BertForMaskedLM
-from transformers import AutoTokenizer, AutoModelForMaskedLM
+from transformers import AutoTokenizer, AutoModelForMaskedLM, AutoModelForPreTraining
 import torch
 from nltk.tokenize import sent_tokenize
 import pandas as pd
@@ -27,10 +27,12 @@ if lang  == "zh":
 
 
 else:
-    model = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
-    #model = AutoModelForMaskedLM.from_pretrained('xlm-roberta-large')
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
-    #tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large')
+    #model = BertForMaskedLM.from_pretrained('bert-base-multilingual-cased')
+    #model = AutoModelForPreTraining.from_pretrained('Maltehb/danish-bert-botxo')
+    model = AutoModelForMaskedLM.from_pretrained('xlm-roberta-large')
+    #tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+    #tokenizer = AutoTokenizer.from_pretrained('Maltehb/danish-bert-botxo', do_lower_case=False)
+    tokenizer = AutoTokenizer.from_pretrained('xlm-roberta-large')
 
 
 model.eval()
@@ -84,8 +86,8 @@ def score(sentence, lang):
 
     if lang == "da":
         print("running Danish")
-        tokenize_mask_male[pron_index] = "hans"
-        tokenize_mask_female[pron_index] = "hendes"
+        tokenize_mask_male[pron_index] = "_hans"
+        tokenize_mask_female[pron_index] = "_hendes"
 
         print("this is the tokenized sentence after masking with male word")
         print(tokenize_mask_male)
