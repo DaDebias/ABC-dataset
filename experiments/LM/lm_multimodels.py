@@ -24,7 +24,6 @@ mod = args.mod
 filename = args.filename
 data = args.data
 
-
 #we use chinese and multilingual bert
 if mod  == "bert-multi":
     from transformers import AutoTokenizer, AutoModelForMaskedLM
