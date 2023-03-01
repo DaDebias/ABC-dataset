@@ -1,38 +1,31 @@
 import json
 import argparse
-
-parser = argparse.ArgumentParser(description='Get differences in pronoun prediction')
-#parser.add_argument('--lang',  type=str, help='language to evaluate')
-parser.add_argument('--coref_output', type=str, help='file to parse for translations')
-args = parser.parse_args()
-
-#lang = args.lang
-filename = args.coref_output
-#filename = "/Users/thearolskovsloth/Documents/MASTERS_I_COGSCI/local_cool_prog_thesis/ABC-dataset/outputs/coref/da_coref.json"
-
+import os
 
 # loads predictions in triplets
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
-def main():
+
+def get_data(filename):
     # load predictions (danish)
     with open(filename, "r") as lst:
         preds = []
         for line in lst.readlines():
             preds.append(json.loads(line.strip()))
+    return preds
 
-    chunk_preds = list(chunks(preds[0], 3))
+def get_f1(chunk_preds):
+    pass
+
+def get_percentage(chunk_preds):
+
+    #reset lists
     ref = 0
     male = 0
     fem = 0
-
-    chosen = []
-    true = []
-
     for p in chunk_preds:
-
         ref_pred = p[0]
         male_pred = p[1]
         fem_pred = p[2]
@@ -55,17 +48,45 @@ def main():
 
                 if cluster != []:
                     fem+=1
+    print()
+    print(f"TOTAL NUMBER OF CLUSTERS PREDICTED BY THE MODEL OUT OF {len(chunk_preds)} SENTENCES:")
+    print("Reflexive case", ref)
+    print("Anti-reflexive - MALE: ", male)
+    print("Anti-reflexive - FEMALE: ", fem)
+    print()
+    print("-----------------------------")
+    print()
+    print("PERCENTAGE OF PREDICTED CLUSTERS:")
+    print()
+    print("Correctly predicted clusters in the reflexive cases:")
+    print("reflexive: ", (ref/len(chunk_preds))*100, "% of the sentences are correctly coreferenced")
+    print()
+    print("Wrongly predicted clusters in the anti-reflexive cases:")
+    print("anti-reflexive possessive pronoun - MALE: ", ((male/len(chunk_preds))*100), "% of the sentences are wrongly coreferenced")
+    print("anti-reflexive possessive pronoun - FEMALE: ", ((fem/len(chunk_preds))*100), "% of the sentences are wrongly coreferenced")
 
+def main(output_type, coref_output_file):
+    #get current working directory
+    path = os.getcwd()
+    #get predictions output from coref model
+    filename = os.path.join(path, "outputs", "coref", args.coref_output_file)
+    
+    preds = get_data(filename)
+    
+    chunk_preds = list(chunks(preds[0], 3))
+    
+    if args.output == "f1":
+        get_f1(chunk_preds)
 
-    print("all", len(chunk_preds))
-    print("reflexive", ref)
-    print("female", fem)
-    print("male", male)
-
-    print("Hallucinating clusters...")
-    print("reflexive: ", (ref/len(chunk_preds))*100, "% of the time")
-    print("male: ", ((male/len(chunk_preds))*100), "% of the time")
-    print("female: ", ((fem/len(chunk_preds))*100), "% of the time")
+    elif args.output == "percentage":
+        get_percentage(chunk_preds)
 
 if __name__ == "__main__":
-    main()
+        
+    parser = argparse.ArgumentParser(description='Get differences in pronoun prediction')
+
+    parser.add_argument('--coref_output_file', type=str, help='file with coref predictions')
+    parser.add_argument('--output', type=str, help='choose between "percentage" or "f1"')
+    args = parser.parse_args()
+    
+    main(args.output, args.coref_output_file)
