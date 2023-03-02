@@ -19,10 +19,8 @@ def get_data(filename):
             preds.append(json.loads(line.strip()))
     return preds
 
-def get_f1(chunk_preds):
-    ref = []
-    male = []
-    fem = []
+def get_f1(chunk_preds, coref_output_file):
+    ref, male, fem = [], [], []
     
     labels_ref = list(np.repeat(1, len(chunk_preds)))
     labels_anti_ref = list(np.repeat(0, len(chunk_preds)))
@@ -31,10 +29,16 @@ def get_f1(chunk_preds):
         ref_pred = p[0]
         male_pred = p[1]
         fem_pred = p[2]
-
-        cluster_ref = ref_pred['clusters']
-        cluster_male = male_pred['clusters']
-        cluster_fem = fem_pred['clusters']
+        
+        if coref_output_file == "xlm-r_coref_da_coref.json":
+            cluster_ref = ref_pred['clusters'] #danish
+            cluster_male = male_pred['clusters'] #danish
+            cluster_fem = fem_pred['clusters'] #danish
+        
+        else: 
+            cluster_ref = ref_pred['predicted_clusters']
+            cluster_male = male_pred['predicted_clusters']
+            cluster_fem = fem_pred['predicted_clusters']
         
         clusters = [cluster_ref, cluster_male, cluster_fem]   
 
@@ -59,9 +63,15 @@ def get_f1(chunk_preds):
                 else:
                     fem.append(0)
                     
-    #f1_ref = f1_score(labels_ref, ref, average='macro', zero_division=1)
-    #f1_male = f1_score(labels_anti_ref, male, average='macro', zero_division=1)
-    #f1_fem = f1_score(labels_anti_ref, fem, average='macro', zero_division=1)
+    f1_ref = f1_score(labels_ref, ref, zero_division=1, average="weighted")
+    f1_male = f1_score(labels_anti_ref, male, zero_division=1, average="weighted")
+    f1_fem = f1_score(labels_anti_ref, fem,  zero_division=1, average="weighted")
+
+    f1_fem_ref = f1_score(labels_ref+labels_anti_ref, ref+fem,  zero_division=1, average="weighted")
+    f1_male_ref = f1_score(labels_ref+labels_anti_ref, ref+male,  zero_division=1, average="weighted")
+    clf_fem_ref = classification_report(labels_ref+labels_anti_ref, ref+fem, zero_division=1)
+    clf_male_ref = classification_report(labels_ref+labels_anti_ref, ref+male, zero_division=1)
+
 
     clf_report_ref = classification_report(labels_ref, ref, zero_division=1)
     clf_report_anti_male = classification_report(labels_anti_ref, male, zero_division=1)
@@ -69,16 +79,28 @@ def get_f1(chunk_preds):
     
     print(f'''
     Classification report for the reflexive case:
+    F1: {f1_ref}
     {clf_report_ref}
     
     Classification report for anti-reflexive male:
+    F1: {f1_male}
     {clf_report_anti_male}
     
     Classification report for anti-reflexive female:
+    F1: {f1_fem}
     {clf_report_anti_fem}
+
+    RELATIVE F1 SCORES:
+    {f1_fem_ref} for fem+ref
+    {clf_fem_ref}
+
+    {f1_male_ref} for male+ref
+
+    {clf_male_ref}
+
     ''')
 
-def get_percentage(chunk_preds):
+def get_percentage(chunk_preds, coref_output_file):
 
     #reset lists
     ref = 0
@@ -89,9 +111,16 @@ def get_percentage(chunk_preds):
         male_pred = p[1]
         fem_pred = p[2]
 
-        cluster_ref = ref_pred['clusters']
-        cluster_male = male_pred['clusters']
-        cluster_fem = fem_pred['clusters']
+        
+        if coref_output_file == "xlm-r_coref_da_coref.json":
+            cluster_ref = ref_pred['clusters'] #danish
+            cluster_male = male_pred['clusters'] #danish
+            cluster_fem = fem_pred['clusters'] #danish
+        
+        else: 
+            cluster_ref = ref_pred['predicted_clusters']
+            cluster_male = male_pred['predicted_clusters']
+            cluster_fem = fem_pred['predicted_clusters']  
         clusters = [cluster_ref, cluster_male, cluster_fem]    
 
         for i, cluster in enumerate(clusters):
@@ -104,12 +133,10 @@ def get_percentage(chunk_preds):
                     male+=1
 
             elif i==2:
-
                 if cluster != []:
                     fem+=1
-    print(
-
-        f''' TOTAL NUMBER OF CLUSTERS PREDICTED BY THE MODEL OUT OF {len(chunk_preds)} SENTENCES:
+    print(f'''
+        TOTAL NUMBER OF CLUSTERS PREDICTED BY THE MODEL OUT OF {len(chunk_preds)} SENTENCES:
         Reflexive case: {ref}
         Anti-reflexive - MALE: {male}
         Anti-reflexive - FEMALE: {fem}
@@ -124,6 +151,11 @@ def get_percentage(chunk_preds):
         Wrongly predicted clusters in the anti-reflexive cases:
         anti-reflexive possessive pronoun - MALE: {((male/len(chunk_preds))*100)} % of the sentences are wrongly coreferenced
         anti-reflexive possessive pronoun - FEMALE: {((fem/len(chunk_preds))*100)} % of the sentences are wrongly coreferenced
+        
+        Relative percentage of predicted clusters - true positives/false positives:
+        relative male: {(ref/male)} 
+        relative female: {(ref/fem)} 
+        (the closer to 1, the more biased is)
         '''
         )
 
@@ -131,17 +163,20 @@ def main(output_type, coref_output_file):
     #get current working directory
     path = os.getcwd()
     #get predictions output from coref model
-    filename = os.path.join(path, "outputs", "coref", args.coref_output_file)
+    filename = os.path.join(path, "outputs", "coref", coref_output_file)
     
     preds = get_data(filename)
     
-    chunk_preds = list(chunks(preds[0], 3))
+    if coref_output_file == "xlm-r_coref_da_coref.json":
+        chunk_preds = list(chunks(preds[0], 3)) #danish
+    else:
+        chunk_preds = list(chunks(preds, 3))
     
-    if args.output == "f1":
-        get_f1(chunk_preds)
+    if output_type == "f1":
+        get_f1(chunk_preds, coref_output_file)
 
-    elif args.output == "percentage":
-        get_percentage(chunk_preds)
+    elif output_type == "percentage":
+        get_percentage(chunk_preds, coref_output_file)
 
 if __name__ == "__main__":
         
