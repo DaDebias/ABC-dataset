@@ -19,8 +19,19 @@ def get_data(filename):
             preds.append(json.loads(line.strip()))
     return preds
 
-def get_f1(chunk_preds, coref_output_file):
-    '''Get F1 score for the reflexive case and the anti-reflexive cases and print output tables.'''
+def get_coref_predictions(chunk_preds, coref_output_file):
+    """Get the coreference predictions for the reflexive case and the anti-reflexive cases.
+    
+    Args:
+        - chunk_preds: list of predictions
+        - coref_output_file: the name of the file where the predictions are stored
+    
+    Returns:
+        - fem
+        - male
+        - reflexive
+    """
+    
     ref, male, fem = [], [], []
     
     # the truth labels for the reflexive case, i.e. all 1s
@@ -43,67 +54,80 @@ def get_f1(chunk_preds, coref_output_file):
 
         for i, cluster in enumerate(clusters):
             if i == 0:
-                #print("CLUSTER", cluster)
                 if cluster != []:
                     ref.append(1)
                 else:
                     ref.append(0)
-                
             elif i==1:
                 if cluster != []:
                     male.append(1)
                 else:
                     male.append(0)
-
             elif i==2:
-
                 if cluster != []:
                     fem.append(1)
                 else:
                     fem.append(0)
-                    
-    f1_ref = f1_score(labels_ref, ref, zero_division=1, average="weighted")
-    f1_male = f1_score(labels_anti_ref, male, zero_division=1, average="weighted")
-    f1_fem = f1_score(labels_anti_ref, fem,  zero_division=1, average="weighted")
-    
+    return ref, male, fem, labels_ref, labels_anti_ref
+
+def get_clf_report(chunk_preds, coref_output_file):
+    ref, male, fem, labels_ref, labels_anti_ref = get_coref_predictions(chunk_preds, coref_output_file)
+
     clf_report_ref = classification_report(labels_ref, ref, zero_division=1)
     clf_report_anti_male = classification_report(labels_anti_ref, male, zero_division=1)
     clf_report_anti_fem = classification_report(labels_anti_ref, fem, zero_division=1)
-    
-    f1_fem_ref = f1_score(labels_ref+labels_anti_ref, ref+fem,  zero_division=1, average="weighted")
-    f1_male_ref = f1_score(labels_ref+labels_anti_ref, ref+male,  zero_division=1, average="weighted")
-    
+
     clf_fem_ref = classification_report(labels_ref+labels_anti_ref, ref+fem, zero_division=1)
     clf_male_ref = classification_report(labels_ref+labels_anti_ref, ref+male, zero_division=1)
     
     print(f'''
     Classification report for the reflexive case:
-    F1: {f1_ref}
     {clf_report_ref}
     
     Classification report for anti-reflexive male:
-    F1: {f1_male}
     {clf_report_anti_male}
     
     Classification report for anti-reflexive female:
-    F1: {f1_fem}
     {clf_report_anti_fem}
+
+    --------------------------------
+
+    RELATIVE CLASSIFICATION REPORTS:
+
+    FEMALE + REFLEXIVE:
+    {clf_fem_ref} for fem+ref
+    
+    MALE + REFLEXIVE:
+    {clf_male_ref} 
+    ''')
+
+def get_f1(chunk_preds, coref_output_file):
+    '''Get F1 score for the reflexive case and the anti-reflexive cases and print output tables.'''
+    
+    ref, male, fem, labels_ref, labels_anti_ref = get_coref_predictions(chunk_preds, coref_output_file)
+                    
+    f1_ref = f1_score(labels_ref, ref, zero_division=1, average="weighted")
+    f1_male = f1_score(labels_anti_ref, male, zero_division=1, average="weighted")
+    f1_fem = f1_score(labels_anti_ref, fem,  zero_division=1, average="weighted")
+       
+    f1_fem_ref = f1_score(labels_ref+labels_anti_ref, ref+fem,  zero_division=1, average="weighted")
+    f1_male_ref = f1_score(labels_ref+labels_anti_ref, ref+male,  zero_division=1, average="weighted")
+    
+    print(f'''
+    F1 for the reflexive case: {f1_ref}
+    F1 for the anti-reflexive male: {f1_male}
+    F1 for the anti-reflexive female: {f1_fem}
 
     --------------------------------
 
     RELATIVE F1 SCORES:
     
-    {f1_fem_ref} for fem+ref
-    {clf_fem_ref}
-
-    {f1_male_ref} for male+ref
-
-    {clf_male_ref}
-
+    Female + reflexive: {f1_fem_ref}
+    Male + reflexive: {f1_male_ref} 
     ''')
 
 def get_percentage(chunk_preds, coref_output_file):
-
+    '''Get percentage scores for the reflexive case and the anti-reflexive cases and print output tables.'''
     #reset lists
     ref, male, fem = 0, 0, 0
     
@@ -177,12 +201,15 @@ def main(output_type, coref_output_file):
     elif output_type == "percentage":
         get_percentage(chunk_preds, coref_output_file)
 
+    elif output_type == "clf_report":
+        get_clf_report(chunk_preds, coref_output_file)
+
 if __name__ == "__main__":
         
     parser = argparse.ArgumentParser(description='Get differences in pronoun prediction')
 
     parser.add_argument('--coref_output_file', type=str, help='file with coref predictions')
-    parser.add_argument('--output', type=str, help='choose between "percentage" or "f1"')
+    parser.add_argument('--output', type=str, help='choose between "percentage" or "f1" or "clf_report"')
     args = parser.parse_args()
     
     main(args.output, args.coref_output_file)
